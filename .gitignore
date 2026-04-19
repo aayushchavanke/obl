@@ -1,0 +1,23 @@
+# Datasets (Exclude the massive 200MB CSV files to prevent GitHub crashing)
+datasets/*.csv
+
+# Python
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+env/
+
+# Node.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# SQLite Databases (Prevent Locking Issues)
+*.db
+*.db-journal
+
+# Secrets / Environment Environment Variables
+.env
+.env.local
+.env.*.local

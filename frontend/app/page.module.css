@@ -1,0 +1,335 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 1.5rem 2rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.dashboard::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(192, 132, 252, 0.18), transparent 20%),
+    radial-gradient(circle at 85% 12%, rgba(168, 85, 247, 0.12), transparent 18%),
+    linear-gradient(180deg, #f5f0ea 0%, #f8f4ff 100%);
+  z-index: -1;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1.1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  box-shadow: 0 18px 36px rgba(124, 58, 237, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  font-size: 1.45rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+
+.brandSub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 0.2rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.topRow {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.healthCard {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff, #fbf7ff);
+}
+
+.ingestionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background:
+    radial-gradient(circle at top right, rgba(124, 58, 237, 0.08), transparent 28%),
+    linear-gradient(180deg, #ffffff, #fbf7ff);
+}
+
+.ingestionCard h3 {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.ingestionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.ingestionGrid {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  height: 100%;
+}
+
+.ingestionCopyBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(124, 58, 237, 0.08);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 245, 255, 0.84));
+}
+
+.ingestionEyebrow {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.ingestionSubcopy {
+  margin-top: 0;
+  max-width: 50ch;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.ingestionHighlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.ingestionStat {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(124, 58, 237, 0.08);
+}
+
+.ingestionStatLabel {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.capturePreset {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 170px;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.captureSectionTitle {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.constraintGroup {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.constraintChip {
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.constraintChipActive {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(124, 58, 237, 0.2));
+  border-color: rgba(124, 58, 237, 0.35);
+  color: var(--accent);
+}
+
+.captureField {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+}
+
+.captureInput {
+  width: 100%;
+  min-width: 10rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  padding: 0.55rem 0.7rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.captureHint {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.captureRow {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 0.95rem 1.05rem;
+  border: 1px solid rgba(124, 58, 237, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.captureButtons {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.captureButtons :global(.btn[disabled]) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.captureInfo {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.lastCaptureNote {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.lastCaptureNote span {
+  color: var(--text-secondary);
+}
+
+.tablesSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.modelBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(135deg, #f4e8ff, #fffdfb);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.8125rem;
+  box-shadow: 0 16px 34px rgba(124, 58, 237, 0.08);
+}
+
+.modelStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modelDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.modelDotActive {
+  background: var(--white-badge);
+  box-shadow: 0 0 6px var(--white-badge);
+}
+
+.modelDotInactive {
+  background: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .topRow {
+    grid-template-columns: 1fr;
+  }
+
+  .topBar,
+  .modelBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ingestionHeader {
+    flex-direction: column;
+  }
+
+  .ingestionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ingestionHighlights {
+    grid-template-columns: 1fr;
+  }
+
+  .capturePreset {
+    width: 100%;
+  }
+
+  .captureButtons {
+    width: 100%;
+  }
+
+  .dashboard {
+    padding: 1rem;
+  }
+}
