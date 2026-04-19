@@ -234,6 +234,79 @@ export default function Dashboard() {
     }
   }, [getCapturePayload, isCapturing, pollCapture]);
 
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.name.toLowerCase().endsWith('.pcap') || file.name.toLowerCase().endsWith('.pcapng')) {
+        setSelectedFile(file);
+      } else {
+        toast.error("Invalid file protocol. Strict .pcap or .pcapng files only.");
+      }
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.name.toLowerCase().endsWith('.pcap') || file.name.toLowerCase().endsWith('.pcapng')) {
+        setSelectedFile(file);
+      } else {
+        toast.error("Invalid file protocol. Strict .pcap or .pcapng files only.");
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+      const res = await fetch(`${API}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+
+      setLastAnalysisId(data.analysis_id);
+      
+      const analyzeRes = await fetch(`${API}/api/analyze/${data.analysis_id}`);
+      const analyzeData = await analyzeRes.json();
+      
+      if (!analyzeRes.ok || analyzeData.error) throw new Error(analyzeData.error || "Analysis failed.");
+
+      toast.success("PCAP successfully uploaded and analyzed.");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      refreshData();
+    } catch (error) {
+      toast.error(error.message || "Upload failed.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const stopAndAnalyze = async () => {
     if (!isCapturing && !captureFinalizingRef.current) return;
     await finalizeCapture();
@@ -341,6 +414,65 @@ export default function Dashboard() {
                     Stop Capture
                   </button>
                 </div>
+                
+                {/* Modern Drag and Drop Zone */}
+                <div 
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  style={{ 
+                    marginTop: '1.5rem', 
+                    padding: '1.5rem', 
+                    border: isDragging ? '2px dashed var(--accent)' : '2px dashed rgba(255, 255, 255, 0.1)', 
+                    borderRadius: '12px',
+                    background: isDragging ? 'rgba(138, 0, 196, 0.05)' : 'rgba(0, 0, 0, 0.2)',
+                    textAlign: 'center',
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                >
+                   <input 
+                     type="file" 
+                     accept=".pcap,.pcapng" 
+                     onChange={handleFileChange}
+                     ref={fileInputRef}
+                     disabled={isUploading}
+                     style={{ display: 'none' }}
+                   />
+                   
+                   {!selectedFile ? (
+                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={isDragging ? 'var(--accent)' : 'var(--text-muted)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke 0.2s ease' }}>
+                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                         <polyline points="17 8 12 3 7 8"></polyline>
+                         <line x1="12" y1="3" x2="12" y2="15"></line>
+                       </svg>
+                       <span style={{ color: isDragging ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: "0.9rem", transition: 'color 0.2s ease' }}>
+                         {isDragging ? "Drop forensic file to ingest" : "Drag and drop PCAP file here, or click to browse"}
+                       </span>
+                     </div>
+                   ) : (
+                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                           <polyline points="14 2 14 8 20 8"></polyline>
+                         </svg>
+                         <span style={{ color: 'white', fontSize: '0.85rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{selectedFile.name}</span>
+                       </div>
+                       <button 
+                         className="btn btn-accent btn-sm"
+                         onClick={(e) => { e.stopPropagation(); handleUpload(); }}
+                         disabled={isUploading}
+                         style={{ marginLeft: '10px', minWidth: '100px' }}
+                       >
+                         {isUploading ? "Uploading..." : "Analyze"}
+                       </button>
+                     </div>
+                   )}
+                </div>
+
               </div>
             </div>
           </div>
