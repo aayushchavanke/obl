@@ -271,6 +271,78 @@ def delete_analysis_record(analysis_id):
         
     return jsonify({'success': True}), 200
 
+
+# ═════════════════════════════════════════════════════════════════════════
+#  API: HARD SYSTEM RESET
+# ═════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/reset', methods=['POST'])
+def hard_reset():
+    """Wipe all uploads, analysis cache, identity DB, and reports. Non-reversible."""
+    import shutil
+    errors = []
+
+    # 1. Wipe analysis cache (in-memory + disk)
+    try:
+        analysis_cache.clear()
+        if os.path.isdir(ANALYSIS_FOLDER):
+            for f in os.listdir(ANALYSIS_FOLDER):
+                fp = os.path.join(ANALYSIS_FOLDER, f)
+                try:
+                    os.remove(fp)
+                except Exception as e:
+                    errors.append(f"cache:{f}:{e}")
+    except Exception as e:
+        errors.append(f"analysis_folder:{e}")
+
+    # 2. Wipe uploaded PCAPs
+    try:
+        if os.path.isdir(UPLOAD_FOLDER):
+            for f in os.listdir(UPLOAD_FOLDER):
+                fp = os.path.join(UPLOAD_FOLDER, f)
+                try:
+                    os.remove(fp)
+                except Exception as e:
+                    errors.append(f"upload:{f}:{e}")
+    except Exception as e:
+        errors.append(f"upload_folder:{e}")
+
+    # 3. Wipe generated PDF reports
+    try:
+        if os.path.isdir(REPORTS_FOLDER):
+            for f in os.listdir(REPORTS_FOLDER):
+                fp = os.path.join(REPORTS_FOLDER, f)
+                try:
+                    if os.path.isfile(fp):
+                        os.remove(fp)
+                except Exception as e:
+                    errors.append(f"report:{f}:{e}")
+    except Exception as e:
+        errors.append(f"reports_folder:{e}")
+
+    # 4. Wipe identity database — drop all tables and recreate schema
+    try:
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'obsidian_identities.db')
+        if os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row[0] for row in cur.fetchall()]
+            for table in tables:
+                cur.execute(f"DELETE FROM {table}")
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        errors.append(f"identity_db:{e}")
+
+    print(f"[HARD RESET] System wiped. Errors: {errors or 'None'}")
+    return jsonify({
+        'success': True,
+        'errors': errors,
+        'message': 'System hard reset complete. All data has been purged.'
+    }), 200
+
 # ═════════════════════════════════════════════════════════════════════════
 #  XAI HEURISTIC MAPPINGS
 # ═════════════════════════════════════════════════════════════════════════

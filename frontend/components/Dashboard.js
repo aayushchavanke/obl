@@ -234,6 +234,28 @@ export default function Dashboard() {
     }
   }, [getCapturePayload, isCapturing, pollCapture]);
 
+  const [isResetting, setIsResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const handleHardReset = async () => {
+    setShowResetConfirm(false);
+    setIsResetting(true);
+    try {
+      const res = await fetch(`${API}/api/reset`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('System hard reset complete. All data purged.', { duration: 5000 });
+        await refreshData();
+      } else {
+        toast.error('Reset partially failed. Check backend logs.');
+      }
+    } catch (err) {
+      toast.error('Reset request failed — is the backend running?');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -341,8 +363,55 @@ export default function Dashboard() {
           <button className="btn btn-accent" onClick={refreshData}>
             Sync Dashboard
           </button>
+          <button
+            className="btn btn-danger"
+            onClick={() => setShowResetConfirm(true)}
+            disabled={isResetting}
+            title="Permanently wipe all uploaded files, identities, and analysis records"
+          >
+            {isResetting ? 'Resetting...' : '⚠ Hard Reset'}
+          </button>
         </div>
       </div>
+
+      {/* ── Hard Reset Confirmation Modal ── */}
+      {showResetConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid #ff4444',
+            borderRadius: '16px', padding: '2rem', maxWidth: '420px', width: '90%',
+            textAlign: 'center', boxShadow: '0 0 40px rgba(255,68,68,0.2)'
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⚠️</div>
+            <h2 style={{ color: '#ff4444', marginBottom: '0.75rem', fontSize: '1.2rem' }}>Confirm Hard Reset</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+              This will permanently delete all uploaded PCAP files, analysis records,
+              PDF reports, and identity database entries.<br/><br/>
+              <strong style={{ color: 'white' }}>This action cannot be undone.</strong>
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button
+                className="btn"
+                onClick={() => setShowResetConfirm(false)}
+                style={{ minWidth: '120px' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={handleHardReset}
+                style={{ minWidth: '120px' }}
+              >
+                Yes, Wipe Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.modelBar}>
         <div className={styles.modelStatus}>
