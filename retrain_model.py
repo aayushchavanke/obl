@@ -54,7 +54,9 @@ metrics = classifier.train(X, y)
 
 print(f"\n  TRAINING COMPLETE!")
 print(f"  -> Training Accuracy : {metrics['train_accuracy']*100:.2f}%")
+print(f"  -> Test Accuracy     : {metrics['test_accuracy']*100:.2f}%  ← held-out 20% set (honest)")
 print(f"  -> CV Accuracy       : {metrics['cv_mean_accuracy']*100:.2f}% (+/- {metrics['cv_std']*100:.2f}%)")
+print(f"  -> Train / Test split: {metrics['n_train']:,} / {metrics['n_test']:,} samples")
 print(f"  -> Total Samples     : {metrics['n_samples']:,}")
 print(f"  -> Classes Learned   : {metrics['n_classes']} ({', '.join(metrics['class_labels'])})")
 
@@ -66,8 +68,13 @@ save_model(
     metadata={
         'dataset': 'CICIDS2017 (All 8 files)',
         'n_samples': metrics['n_samples'],
+        'n_train': metrics['n_train'],
+        'n_test': metrics['n_test'],
         'classes': metrics['class_labels'],
         'cv_accuracy': metrics['cv_mean_accuracy'],
+        'cv_std': metrics['cv_std'],
+        'test_accuracy': metrics['test_accuracy'],
+        'train_accuracy': metrics['train_accuracy'],
     }
 )
 print("  -> Model saved to models/current/")

@@ -111,10 +111,26 @@ export default function Dashboard() {
         setLastAnalysisId(data.analysis_id);
         await refreshData();
 
+        // OTX enrichment can take longer (parallel batch of IPs) — give it 4 min
+        const analyzeTimeoutMs = currentMode === CAPTURE_MODE_OTX ? 240_000 : 90_000;
+        const analyzeController = new AbortController();
+        const analyzeTimer = setTimeout(() => analyzeController.abort(), analyzeTimeoutMs);
+
+        if (currentMode === CAPTURE_MODE_OTX) {
+          toast("OTX enrichment running — checking IPs against AlienVault threat feeds...", { duration: 5000 });
+        }
+
         const analyzeUrl = currentMode === CAPTURE_MODE_OTX
           ? `${API}/api/analyze/${data.analysis_id}?otx_only=1`
           : `${API}/api/analyze/${data.analysis_id}`;
-        const analyzeRes = await fetch(analyzeUrl);
+
+        let analyzeRes;
+        try {
+          analyzeRes = await fetch(analyzeUrl, { signal: analyzeController.signal });
+        } finally {
+          clearTimeout(analyzeTimer);
+        }
+
         const analyzeData = await analyzeRes.json();
         if (!analyzeRes.ok || analyzeData.error) {
           throw new Error(analyzeData.error || "Analysis failed after capture.");
@@ -122,8 +138,8 @@ export default function Dashboard() {
 
         toast.success(
           currentMode === CAPTURE_MODE_OTX
-            ? `OTX capture completed: ${analyzeData.otx_only_matches || 0} OTX-matched flows returned.`
-            : `Live capture completed: ${(data.packets_captured || 0).toLocaleString()} packets analyzed.`,
+            ? `OTX complete: ${analyzeData.otx_only_matches || 0} threat-matched flows found.`
+            : `Live capture complete: ${(data.packets_captured || 0).toLocaleString()} packets analyzed.`,
         );
         await refreshData();
       } else {
@@ -132,7 +148,11 @@ export default function Dashboard() {
       }
     } catch (error) {
       await refreshData();
-      toast.error(error.message || "Failed to stop and analyze the live capture.");
+      if (error.name === "AbortError") {
+        toast.error("Analysis timed out. Try a shorter capture duration or check if the backend is running.");
+      } else {
+        toast.error(error.message || "Failed to stop and analyze the live capture.");
+      }
     } finally {
       setMode(CAPTURE_MODE_STANDARD);
       captureFinalizingRef.current = false;
@@ -438,10 +458,16 @@ export default function Dashboard() {
               fontSize: "0.75rem",
               color: "var(--text-muted)",
             }}
+            title={modelInfo.test_accuracy
+              ? `Held-out test accuracy on 20% unseen data: ${(modelInfo.test_accuracy * 100).toFixed(2)}%. CV accuracy: ${((modelInfo.cv_accuracy || 0) * 100).toFixed(2)}%`
+              : `Cross-validation accuracy on training data`}
           >
             {modelInfo.class_labels?.length || "?"} profiles |{" "}
             {modelInfo.n_samples || "?"} dataset size |{" "}
-            {((modelInfo.cv_accuracy || 0) * 100).toFixed(1)}% accuracy
+            {modelInfo.test_accuracy
+              ? `${(modelInfo.test_accuracy * 100).toFixed(1)}% test accuracy`
+              : `${((modelInfo.cv_accuracy || 0) * 100).toFixed(1)}% cv accuracy`
+            }
           </span>
         )}
       </div>

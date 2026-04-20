@@ -501,6 +501,50 @@ def summarize_otx_enrichment(predictions):
     }
 
 
+_OTX_EMPTY = {
+    'reputation_available': False,
+    'malicious': False,
+    'pulse_count': 0,
+    'pulse_names': [],
+    'malware_tags': [],
+    'country_name': '',
+    'asn': '',
+    'last_seen': '',
+    'intel_severity': 'none',
+    'threat_reputation_summary': 'No source IP available.',
+    'otx_score': 0.0,
+}
+
+
+def _batch_otx_lookup(ip_list, api_key, max_workers=8):
+    """
+    Parallel OTX lookup for a de-duplicated list of IPs.
+    Returns a dict mapping ip -> otx_result.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from core.otx_enrichment import check_ip_reputation
+
+    unique_ips = [ip for ip in dict.fromkeys(ip_list) if ip]  # preserve order, deduplicate
+    print(f"[OTX] Batch-resolving {len(unique_ips)} unique IPs (parallel, max={max_workers} workers)...")
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        future_to_ip = {
+            pool.submit(check_ip_reputation, ip, api_key): ip
+            for ip in unique_ips
+        }
+        for future in as_completed(future_to_ip):
+            ip = future_to_ip[future]
+            try:
+                results[ip] = future.result()
+            except Exception as exc:
+                print(f"[OTX] Lookup failed for {ip}: {exc}")
+                results[ip] = dict(_OTX_EMPTY, threat_reputation_summary=f'Lookup error: {exc}')
+
+    print(f"[OTX] Batch complete: {sum(1 for r in results.values() if r.get('malicious'))} malicious IPs found.")
+    return results
+
+
 def select_primary_explanation(explanations, predictions):
     if not explanations:
         return None, None
@@ -720,18 +764,21 @@ def run_analysis(analysis_id):
         try:
             from ml.model_manager import load_model
             from xai.explainer import explain_batch
-            from core.otx_enrichment import check_ip_reputation
             classifier, preprocessor, model_meta = load_model()
 
             X = preprocessor.transform(features_df)
             results = classifier.predict_with_details(X)
             per_flow_explanations = explain_batch(classifier, X)
 
+            # Step 5 pre-pass: batch-resolve all unique src IPs via OTX in parallel
+            all_src_ips = [str(features_df.iloc[i].get('src_ip', '') or '') for i in range(len(results))]
+            otx_cache = _batch_otx_lookup(all_src_ips, OTX_API_KEY)
+
             # Step 5: Store each classified flow as an identity in DB
             for i, pred in enumerate(results):
                 row = features_df.iloc[i]
-                src_ip = row.get('src_ip', '')
-                dst_ip = row.get('dst_ip', '')
+                src_ip = str(row.get('src_ip', '') or '')
+                dst_ip = str(row.get('dst_ip', '') or '')
                 ja3_hash = ''
 
                 # Determine category
@@ -742,18 +789,7 @@ def run_analysis(analysis_id):
                     category = 'white'
                     threat_type = 'Safe Traffic'
 
-                otx_result = check_ip_reputation(src_ip, api_key=OTX_API_KEY) if src_ip else {
-                    'reputation_available': False,
-                    'malicious': False,
-                    'pulse_count': 0,
-                    'pulse_names': [],
-                    'malware_tags': [],
-                    'country_name': '',
-                    'last_seen': '',
-                    'intel_severity': 'none',
-                    'threat_reputation_summary': 'No source IP available for OTX lookup.',
-                    'otx_score': 0.0,
-                }
+                otx_result = otx_cache.get(src_ip, _OTX_EMPTY) if src_ip else _OTX_EMPTY
 
                 pulse_count = int(otx_result.get('pulse_count', 0) or 0)
                 otx_malicious = bool(otx_result.get('malicious'))
@@ -843,25 +879,20 @@ def run_analysis(analysis_id):
             explanations = build_xai_summary(per_flow_explanations, predictions)
 
         except FileNotFoundError:
-            from core.otx_enrichment import check_ip_reputation
+            # No ML model — OTX-only enrichment path
+            all_src_ips_nomodel = [
+                str(features_df.iloc[i].get('src_ip', '') or '')
+                for i in range(len(features_df))
+            ]
+            otx_cache_nomodel = _batch_otx_lookup(all_src_ips_nomodel, OTX_API_KEY)
+
             predictions = []
             for i in range(len(features_df)):
                 row = features_df.iloc[i]
-                src_ip = row.get('src_ip', '')
-                dst_ip = row.get('dst_ip', '')
-                
-                otx_result = check_ip_reputation(src_ip, api_key=OTX_API_KEY) if src_ip else {
-                    'reputation_available': False,
-                    'malicious': False,
-                    'pulse_count': 0,
-                    'pulse_names': [],
-                    'malware_tags': [],
-                    'country_name': '',
-                    'last_seen': '',
-                    'intel_severity': 'none',
-                    'threat_reputation_summary': 'No source IP available for OTX lookup.',
-                    'otx_score': 0.0,
-                }
+                src_ip = str(row.get('src_ip', '') or '')
+                dst_ip = str(row.get('dst_ip', '') or '')
+
+                otx_result = otx_cache_nomodel.get(src_ip, _OTX_EMPTY) if src_ip else _OTX_EMPTY
                 
                 pulse_count = int(otx_result.get('pulse_count', 0) or 0)
                 otx_malicious = bool(otx_result.get('malicious'))

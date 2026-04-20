@@ -22,5 +22,9 @@
     "port_scan",
     "web_browser"
   ],
-  "cv_accuracy": 0.9996
+  "cv_accuracy": 0.9996,
+  "train_accuracy": 1.0,
+  "test_accuracy": null,
+  "cv_std": 0.0002,
+  "note": "cv_accuracy reflects in-sample cross-val on CICIDS2017 lab dataset. Re-run retrain_model.py to get a proper held-out test_accuracy."
 }

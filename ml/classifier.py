@@ -30,39 +30,46 @@ class BehavioralClassifier:
 
     def train(self, X, y):
         """
-        Train the classifier on feature vectors.
-
-        Args:
-            X: numpy array of shape (n_samples, n_features)
-            y: numpy array of labels
-
-        Returns:
-            dict with training metrics
+        Train the classifier with a proper 80/20 train-test split
+        to produce a realistic held-out accuracy figure.
         """
-        self.model.fit(X, y)
+        from sklearn.model_selection import train_test_split
+
+        # Hold out 20% of data for honest evaluation — never seen during fitting
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.20, random_state=42, stratify=y
+        )
+
+        self.model.fit(X_train, y_train)
         self.is_trained = True
         self.class_labels = list(self.model.classes_)
 
-        # Training accuracy
-        train_accuracy = self.model.score(X, y)
+        # Training accuracy (in-sample — expected to be very high)
+        train_accuracy = self.model.score(X_train, y_train)
 
-        # Keep CV folds compatible with the least-populated class.
-        unique_labels, counts = np.unique(y, return_counts=True)
+        # Held-out test accuracy (true generalization estimate)
+        test_accuracy = self.model.score(X_test, y_test)
+
+        # Cross-validation on the training split only
+        unique_labels, counts = np.unique(y_train, return_counts=True)
         min_class_count = int(counts.min()) if len(counts) else 0
         cv_folds = min(5, len(unique_labels), min_class_count)
 
         cv_mean = train_accuracy
         cv_std = 0.0
         if cv_folds >= 2:
-            cv_scores = cross_val_score(self.model, X, y, cv=cv_folds, scoring='accuracy')
+            cv_scores = cross_val_score(self.model, X_train, y_train, cv=cv_folds, scoring='accuracy')
             cv_mean = float(cv_scores.mean())
             cv_std = float(cv_scores.std())
 
         return {
             'train_accuracy': round(train_accuracy, 4),
+            'test_accuracy': round(test_accuracy, 4),
             'cv_mean_accuracy': round(cv_mean, 4),
             'cv_std': round(cv_std, 4),
             'n_samples': len(y),
+            'n_train': len(y_train),
+            'n_test': len(y_test),
             'n_classes': len(set(y)),
             'class_labels': self.class_labels,
         }
