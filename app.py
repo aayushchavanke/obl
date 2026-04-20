@@ -13,6 +13,13 @@ import traceback
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 
+# Load .env before config reads environment variables
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
+except ImportError:
+    pass  # dotenv optional: env vars can still be set in the OS environment
+
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
