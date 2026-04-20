@@ -216,11 +216,20 @@ def list_interfaces():
 def start_capture():
     from core.live_capture import start_capture as _start
     data = request.get_json(silent=True) or {}
+    mode = data.get('mode', 'live')
+
+    # Warn early if OTX mode is requested without a valid API key
+    if mode == 'otx' and not OTX_API_KEY:
+        return jsonify({
+            'status': 'error',
+            'error': 'OTX API key not configured. Set the OTX_API_KEY environment variable and restart the server.'
+        }), 400
+
     result = _start(
         interface=data.get('interface'),
         duration=data.get('duration', 120),
         packet_count=data.get('packet_count', 3000),
-        mode=data.get('mode', 'live'),
+        mode=mode,
     )
     return jsonify(result)
 
@@ -320,19 +329,10 @@ def hard_reset():
     except Exception as e:
         errors.append(f"reports_folder:{e}")
 
-    # 4. Wipe identity database — drop all tables and recreate schema
+    # 4. Wipe identity database (including fingerprint JSON files)
     try:
-        import sqlite3
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'obsidian_identities.db')
-        if os.path.exists(db_path):
-            conn = sqlite3.connect(db_path)
-            cur = conn.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = [row[0] for row in cur.fetchall()]
-            for table in tables:
-                cur.execute(f"DELETE FROM {table}")
-            conn.commit()
-            conn.close()
+        from core.identity_db import clear_all
+        clear_all()
     except Exception as e:
         errors.append(f"identity_db:{e}")
 
@@ -488,7 +488,7 @@ def summarize_otx_enrichment(predictions):
         'provider': 'AlienVault OTX',
         'lookups_performed': len(enriched),
         'malicious_matches': len(malicious),
-        'max_pulse_count': max((p.get('otx_pulse_count', 0) for p in malicious), default=0),
+        'max_pulse_count': max((int(p.get('otx_pulse_count', 0) or 0) for p in predictions), default=0),
         'pulse_names': _uniq(pulse_names),
         'tags': _uniq(tags),
     }
@@ -992,12 +992,16 @@ def block_identity_endpoint(identity_id):
     import subprocess
     block_success = []
     for ip in identity.get('associated_ips', []):
+        if not ip or ip in ('127.0.0.1', 'localhost', '0.0.0.0', '::1'):
+            continue
         try:
-            rule_name = f"OBSIDIAN_BLOCK_{ip}"
-            cmd_in = ['netsh', 'advfirewall', 'firewall', 'add', 'rule', f'name={rule_name}', 'dir=in', 'action=block', f'remoteip={ip}']
-            cmd_out = ['netsh', 'advfirewall', 'firewall', 'add', 'rule', f'name={rule_name}_OUT', 'dir=out', 'action=block', f'remoteip={ip}']
-            subprocess.run(cmd_in, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(cmd_out, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            rule_name = f"OBSIDIAN_BLOCK_{identity_id}_{ip}"
+            subprocess.run(['netsh', 'advfirewall', 'firewall', 'add', 'rule',
+                f'name={rule_name}_IN', 'dir=in', 'action=block', f'remoteip={ip}'],
+                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['netsh', 'advfirewall', 'firewall', 'add', 'rule',
+                f'name={rule_name}_OUT', 'dir=out', 'action=block', f'remoteip={ip}'],
+                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             block_success.append(ip)
         except Exception as e:
             print(f"Failed to elevate firewall block for {ip}: {e}")
@@ -1017,16 +1021,18 @@ def unblock_identity_endpoint(identity_id):
     import subprocess
     unblock_success = []
     for ip in identity.get('associated_ips', []):
+        if not ip or ip in ('127.0.0.1', 'localhost', '0.0.0.0', '::1'):
+            continue
         try:
-            rule_name = f"OBSIDIAN_BLOCK_{ip}"
-            cmd_in = ['netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={rule_name}']
-            cmd_out = ['netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={rule_name}_OUT']
-            subprocess.run(cmd_in, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(cmd_out, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            rule_name = f"OBSIDIAN_BLOCK_{identity_id}_{ip}"
+            subprocess.run(['netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={rule_name}_IN'],
+                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={rule_name}_OUT'],
+                check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             unblock_success.append(ip)
         except Exception as e:
             print(f"Failed to elevate firewall unblock for {ip}: {e}")
-            
+
     unblock_identity(identity_id)
     return jsonify({'status': 'unblocked', 'identity_id': identity_id, 'firewall_unblocked_ips': unblock_success})
 

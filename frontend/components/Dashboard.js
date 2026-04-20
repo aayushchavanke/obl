@@ -36,6 +36,7 @@ export default function Dashboard() {
   const captureModeRef = useRef(CAPTURE_MODE_STANDARD);
   const captureIntervalRef = useRef(null);
   const captureFinalizingRef = useRef(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   const setMode = (mode) => {
     setCaptureMode(mode);
@@ -86,6 +87,9 @@ export default function Dashboard() {
   const finalizeCapture = useCallback(async () => {
     if (captureFinalizingRef.current) return;
     captureFinalizingRef.current = true;
+    setIsFinalizing(true);
+    setIsCapturing(false);
+    setCaptureStats({ packets: 0, elapsed: 0 });
 
     if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
     captureIntervalRef.current = null;
@@ -98,7 +102,6 @@ export default function Dashboard() {
         body: JSON.stringify({ mode: currentMode }),
       });
       const data = await res.json();
-      setIsCapturing(false);
 
       if (data.error) {
         throw new Error(data.error);
@@ -128,12 +131,12 @@ export default function Dashboard() {
         await refreshData();
       }
     } catch (error) {
-      setIsCapturing(false);
       await refreshData();
       toast.error(error.message || "Failed to stop and analyze the live capture.");
     } finally {
       setMode(CAPTURE_MODE_STANDARD);
       captureFinalizingRef.current = false;
+      setIsFinalizing(false);
     }
   }, [refreshData]);
 
@@ -553,9 +556,9 @@ export default function Dashboard() {
               </span>
             </div>
           )}
-          {captureFinalizingRef.current && (
+          {isFinalizing && (
             <div className={styles.captureRow}>
-              <span className={styles.captureInfo}>Finalizing capture...</span>
+              <span className={styles.captureInfo}>Finalizing capture — analyzing traffic...</span>
             </div>
           )}
 
